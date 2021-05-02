@@ -1,0 +1,80 @@
+diff --color -r -a -u dnsmasq-2.80.orig/src/cache.c dnsmasq-2.80/src/cache.c
+--- dnsmasq-2.80.orig/src/cache.c	2018-09-18 01:11:25.000000000 +0200
++++ dnsmasq-2.80/src/cache.c	2021-05-02 11:05:21.118754600 +0200
+@@ -64,6 +64,7 @@
+   { 52,  "TLSA" },
+   { 53,  "SMIMEA" },
+   { 55,  "HIP" },
++  { 65,  "HTTPS" },
+   { 249, "TKEY" },
+   { 250, "TSIG" },
+   { 251, "IXFR" },
+diff --color -r -a -u dnsmasq-2.80.orig/src/dnsmasq.h dnsmasq-2.80/src/dnsmasq.h
+--- dnsmasq-2.80.orig/src/dnsmasq.h	2021-05-02 10:57:30.000000000 +0200
++++ dnsmasq-2.80/src/dnsmasq.h	2021-05-02 11:40:48.888754600 +0200
+@@ -263,7 +263,8 @@
+ #define OPT_TFTP_APREF_MAC 56
+ #define OPT_RAPID_COMMIT   57
+ #define OPT_UBUS           58
+-#define OPT_LAST           59
++#define OPT_FILTER_HTTPS   59
++#define OPT_LAST           60
+ 
+ /* extra flags for my_syslog, we use a couple of facilities since they are known 
+    not to occupy the same bits as priorities, no matter how syslog.h is set up. */
+diff --color -r -a -u dnsmasq-2.80.orig/src/dns-protocol.h dnsmasq-2.80/src/dns-protocol.h
+--- dnsmasq-2.80.orig/src/dns-protocol.h	2018-09-18 01:11:25.000000000 +0200
++++ dnsmasq-2.80/src/dns-protocol.h	2021-05-02 11:39:50.238754600 +0200
+@@ -71,6 +71,7 @@
+ #define T_NSEC          47
+ #define T_DNSKEY        48
+ #define T_NSEC3         50
++#define T_HTTPS         65
+ #define	T_TKEY		249		
+ #define	T_TSIG		250
+ #define T_AXFR          252
+diff --color -r -a -u dnsmasq-2.80.orig/src/option.c dnsmasq-2.80/src/option.c
+--- dnsmasq-2.80.orig/src/option.c	2018-09-18 01:11:25.000000000 +0200
++++ dnsmasq-2.80/src/option.c	2021-05-02 11:43:21.198754600 +0200
+@@ -166,6 +166,7 @@
+ #define LOPT_UBUS          354
+ #define LOPT_NAME_MATCH    355
+ #define LOPT_CAA           356
++#define LOPT_FILTER_HTTPS  357
+  
+ #ifdef HAVE_GETOPT_LONG
+ static const struct option opts[] =  
+@@ -337,6 +338,7 @@
+     { "dhcp-rapid-commit", 0, 0, LOPT_RAPID_COMMIT },
+     { "dumpfile", 1, 0, LOPT_DUMPFILE },
+     { "dumpmask", 1, 0, LOPT_DUMPMASK },
++    { "filter-https", 0, 0, LOPT_FILTER_HTTPS },
+     { NULL, 0, 0, 0 }
+   };
+ 
+@@ -515,6 +517,7 @@
+   { LOPT_RAPID_COMMIT, OPT_RAPID_COMMIT, NULL, gettext_noop("Enables DHCPv4 Rapid Commit option."), NULL },
+   { LOPT_DUMPFILE, ARG_ONE, "<path>", gettext_noop("Path to debug packet dump file"), NULL },
+   { LOPT_DUMPMASK, ARG_ONE, "<hex>", gettext_noop("Mask which packets to dump"), NULL },
++  { LOPT_FILTER_HTTPS, OPT_FILTER_HTTPS, NULL, gettext_noop("Filter all HTTPS / Type 65 requests."), NULL },
+   { 0, 0, NULL, NULL, NULL }
+ }; 
+ 
+diff --color -r -a -u dnsmasq-2.80.orig/src/rfc1035.c dnsmasq-2.80/src/rfc1035.c
+--- dnsmasq-2.80.orig/src/rfc1035.c	2021-05-02 10:57:30.000000000 +0200
++++ dnsmasq-2.80/src/rfc1035.c	2021-05-02 11:55:19.678754600 +0200
+@@ -1834,6 +1834,13 @@
+ 	    }
+ 	}
+ 
++	  if (qtype == T_HTTPS && option_bool(OPT_FILTER_HTTPS) )
++	    {
++	      ans = 1;
++	      if (!dryrun)
++		log_query(F_CONFIG | F_IPV4 | F_NEG, name, &addr, NULL);
++	    }
++
+       if (!ans)
+ 	return 0; /* failed to answer a question */
+     }
+Only in dnsmasq-2.80: .vscode
